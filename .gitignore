@@ -1,0 +1,5 @@
+localstack_data/
+*.exe
+*.test
+.env
+!configs/*.env
