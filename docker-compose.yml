@@ -1,0 +1,23 @@
+services:
+  localstack:
+    image: localstack/localstack:3.8.1
+    container_name: aws_localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,sns,dynamodb,ses
+      - DEBUG=1
+
+  go-aws-service:
+    build: .
+    container_name: go_aws_service
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - S3_BUCKET=user-avatars-bucket
+      - DYNAMO_TABLE=UserOrders
+    depends_on:
+      - localstack

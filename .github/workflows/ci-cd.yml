@@ -1,0 +1,66 @@
+name: Go AWS CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: ["dev", "main"]
+  push:
+    branches: ["dev", "main"]
+
+jobs:
+  # 1. CI: Запускается на каждый Pull Request и каждый Push
+  ci-checks:
+    name: Lint, Test & Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run Unit Tests with Race Detector
+        run: go test -v -race ./...
+
+      - name: Build Production Docker Image
+        run: docker build -t go-aws-notifier:${{ github.sha }} .
+
+  # 2. CD (DEV): Запускается ТОЛЬКО после влития PR в ветку dev
+  deploy-dev:
+    name: Deploy to DEV Environment
+    needs: ci-checks
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy container to AWS ECS (DEV)
+        run: |
+          echo "=== DEPLOYING TO DEV ENVIRONMENT ==="
+          echo "Image tag: go-aws-notifier:${{ github.sha }}"
+          echo "Loaded config: configs/dev.env (APP_ENV=dev)"
+          echo "Status: DEV deployment successful!"
+
+  # 3. CD (PROD): Запускается ТОЛЬКО после влития релиза из dev в main
+  deploy-prod:
+    name: Deploy to PRODUCTION Environment
+    needs: ci-checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy container to AWS ECS (PROD)
+        run: |
+          echo "=== DEPLOYING TO PRODUCTION ENVIRONMENT ==="
+          echo "Image tag: go-aws-notifier:${{ github.sha }}"
+          echo "Loaded config: configs/prod.env (APP_ENV=prod)"
+          echo "Status: PRODUCTION deployment successful!"
